@@ -1,4 +1,4 @@
-# 发布清单（M6）
+# 发布清单（dsh-first-principles）
 
 > 状态：**包已备好，只差你的 npm 账号。** 本机 `npm whoami` = `ENEEDAUTH`，我没有你的 token，也不该有。
 > 本文件是"谁做什么"的分界线：凡需要你账号或身份的动作，只由你执行。
@@ -37,7 +37,20 @@ npm view dsh-first-principles version     # 应打印 0.3.1
 
 发布后**不要**立刻改版本重发。若发错了：72 小时内 `npm unpublish dsh-first-principles@0.3.1`，超时只能 `npm deprecate`。
 
-## 4. 发布后验证（必须做，别信"发布成功"这四个字）
+## 4. 仓库（已完成）
+
+代码已推上 GitHub（本机 github.com:443 被网络挡住，走的 api.github.com 建 blob/tree/commit）：
+
+| 项 | 值 |
+| --- | --- |
+| 仓库 | https://github.com/fengt8291-lab/dsh-first-principles |
+| 可见性 | public，45 个文件、2 个 commit |
+| topic | `dsh-plugin`、`dsh`、`deepseek`、`reasoning`、`decision-ledger` |
+| 插件包位置 | 仓库子目录 `plugin/`（monorepo 子包形态） |
+
+推代码用的脚本：`/tmp/push-via-api2.py`（blob → tree → commit → ref；空仓库先 PUT 一个 `.gitignore` 建首 commit）。
+
+## 5. 发布后验证（必须做，别信"发布成功"这四个字）
 
 新开一个临时 profile 装回来，证明"别人的电脑上也能用"：
 
@@ -48,19 +61,29 @@ dsh --profile <temp-profile> plugin add dsh-first-principles@0.3.1
 
 在装回来之前，先确认这台机器上的旧版本已卸载，否则你验证的是 `link:` 而不是 npm 包。
 
-## 5. 进市场
+## 6. 进市场（PR 已备好，等仓库满 24 小时）
 
-市场索引 `Awesome DSH Plugin`（`https://cdn.jsdelivr.net/npm/dsh-plugin-catalog/index.json`）里的条目是**包名 + 简介 + 分类**。当前 3112 条里 `first principles` 命中 0 条、`ledger` 22 条（全是记忆/成本类，无校验类），见 `docs/evidence/market-scan-2026-10-20.md`。
+收录规则来自 `https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/contributing.md`：
 
-提交方式：走索引仓库的 PR（具体仓库地址在发布当天以索引页脚为准，此处不写死，避免又一条会烂的链接）。条目建议：
+- 一个 PR 只加**一个文件**：`data/plugins/<owner>__<repo>.yml`（monorepo 子包用 `--<子目录>` 后缀）。
+- 仓库 `package.json` 必须声明 `dsh.bundle`（我们是 monorepo 子包，`plugin/package.json` 满足）。
+- 仓库必须**创建满 1 天**（CI 自动查），并带 `dsh-plugin` topic。
+- 描述必须与代码一致，不吹；只有 `description.en` 是必填。
+
+本地已备好的条目：`docs/market/fengt8291-lab__dsh-first-principles--plugin.yml`
 
 ```yaml
-name: dsh-first-principles
-description: 可核验的第一性原理台账：事实必须落回真实 file:line，假设必须可证伪，结论必须挂到期日
-category: 推理与决策
+url: https://github.com/fengt8291-lab/dsh-first-principles/tree/main/plugin
+name: fengt8291-lab/dsh-first-principles#plugin
+category: workflow
+description:
+  en: '...'   # 全文见上面那个文件
+  zh: '...'
 ```
 
-## 6. 版本策略
+提交时机：仓库建于 2026-10-20 22:46，**2026-10-21 22:46 之后**再开 PR；提前开 CI 会因仓库年龄挡下（指南说这不影响重新提交）。
+
+## 7. 版本策略
 
 | 改动 | 版本 |
 | --- | --- |
@@ -68,7 +91,7 @@ category: 推理与决策
 | 新错误码、新命令、新配置项 | minor（0.x.0） |
 | 台账格式破坏性变更 | minor 且在 `docs/LEDGER-FORMAT.md` 写迁移说明（0.x 阶段不升 major） |
 
-## 7. 发布前的已知缺口（不阻塞，但要诚实）
+## 8. 发布前的已知缺口（不阻塞，但要诚实）
 
 - 示例台账只有 1 份（`examples/trial-length.md`），计划补到 3 份。
 - README 主文档是中文，`plugin/README.md` 有英文段；市场条目两种语言都写了。
