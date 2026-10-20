@@ -1,0 +1,56 @@
+{
+  "name": "dsh-first-principles",
+  "version": "0.3.1",
+  "description": "First-principles ledger for DeepSeek Harness: a machine-checked reasoning artifact whose every fact must resolve to a real file:line, plus a panel showing what each round fixed.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "first-principles",
+    "reasoning",
+    "decision",
+    "adr",
+    "ledger",
+    "premortem"
+  ],
+  "engines": {
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "src",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fengt8291-lab/dsh-first-principles.git"
+  },
+  "homepage": "https://github.com/fengt8291-lab/dsh-first-principles",
+  "bugs": {
+    "url": "https://github.com/fengt8291-lab/dsh-first-principles/issues"
+  }
+}

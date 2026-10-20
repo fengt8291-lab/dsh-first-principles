@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "First Principles",
+    "description": "Checkable first-principles ledgers: every fact must resolve to a real file:line, every assumption must be falsifiable."
+  }
+}

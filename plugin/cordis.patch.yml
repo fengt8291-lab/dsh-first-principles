@@ -1,0 +1,7 @@
+- insert:
+    - id: first-principles
+      name: dsh-first-principles
+      config:
+        language: zh-CN
+        dir: .fp
+        gate: false

@@ -1,0 +1,3 @@
+{"ts":"2026-10-20T12:57:43.189Z","ledger":".fp/ledgers/plugin-direction.md","verdict":"fail","errors":["E006"],"warnings":["W006","W005"],"facts":12,"conclusions":5,"ms":5}
+{"ts":"2026-10-20T12:57:48.685Z","ledger":".fp/ledgers/plugin-direction.md","verdict":"fail","errors":["E006"],"warnings":["W006","W005"],"facts":12,"conclusions":5,"ms":5}
+{"ts":"2026-10-20T14:18:29.636Z","ledger":".fp/ledgers/plugin-direction.md","verdict":"pass","errors":[],"warnings":["W006","W005"],"facts":12,"conclusions":5,"ms":5,"session":"61355141-d11d-42b4-b20b-42c810f79e79"}
