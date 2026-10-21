@@ -114,7 +114,7 @@ M0 的真实价值是**验证了“可围栏化错误”能被稳定抓住**：�
 | M2（已完成） | 证据核对 + 模板真实事实 + 中英别名 | 模板开箱 `verdict=pass`；E006 能抓住改一个字的引文 |
 | M3（已完成） | `/fp` 命令 + 提示段 + 报告渲染 | 无参调用返回可写模板；`/fp <file>` 可校验 |
 | **M3.5（已完成）** | **证据落地**：`docs/evidence/` 约定 + 自引禁区 `E017`/`W006` | 外部材料先落盘再引用；台账引用决策文档会被打回 |
-| **M3.6（新增）** | **跨会话锚点**：用 `sessionProjections` 把 `question` / `C*` / 未决 `O*` 投影成会话级状态 | 新会话里能查到上一个会话的 question 与结论；目标漂移会被指出 |
+| **M3.6（已完成，2026-10-21）** | **跨会话锚点**：`src/anchor.js` 抽最近 3 份台账的 `question` / `C*` / 未决 `O*` / 复查日期；工具加 `context: true`、斜杠命令 `/fp context`、系统提示加一条「新会话先读锚点」；另加 `W008`（项目里还有另一份没过期、问法不同的台账） | 89 tests（锚点 7 例）；实测对真实台账输出「问题 + C1–C5 + O1–O4 + 复查还有 30 天」。**平台限制**：这份 DSH 构建里 `Agent` 公开接口只有 `{ id }`，`systemPrompt.context()` 的 `AssembleContext` 也只有 `{ scope, signal }`，拿不到会话 cwd，所以做成「工具 + 命令 + 提示」而不是自动注入系统提示 |
 | **M4（已完成）** | **复查字段 + 可移植**：`review_after`/`confidence`/`kill`（`E018`/`E019`/`W007`）、`/fp status` 过期标记、`/fp reanchor` 重锚、`/fp review` 盖日期；根目录定位、路径/编码/大小容错（`E020`）、`.fp/runs.jsonl` + `/fp stats` | 58 tests 通过（含 `tests/portability.test.js` 7 例：Python/Go/Rust/monorepo/中文空格路径/裸目录/自定义台账目录）；过期台账被标出；改文档后一条命令修复全部漂移；没有 `package.json` 的项目也能开箱生成可过检骨架 |
 | **M5（已完成）** | **可选闸门（含相关性判断）**：`tools/pre-execute` 监听器，只对不可逆操作（`rm -r`/`git push --force`/`npm publish`/`gh * delete`/`docker rm`/`kubectl delete`/`drop table`/`dd` 写盘）返回 `ask`；默认关，`/fp gate on\|off` 可切，判断落 `.fp/gate.jsonl` | 66 tests 通过（闸门 8 例；面板与 inject 修复后全套 75）；关着零打扰、打开后普通命令不碰；询问日志可回看，误拦率可观察；拿不到上下文时一律放行；**M5.1 相关性**：`rm` 的目标路径必须被某份通过台账的 `scope` 覆盖，整仓/项目外/通配符目标不判断（宁可漏不误拦），询问原因写进 `gate.jsonl` 的 `reason`/`targets` |
 | M6 | 分发：npm 发布 + `dsh-plugin` 市场条目 + 双语 README + 3 个示例台账 | `npm view dsh-first-principles` 有版本；市场可搜到 |

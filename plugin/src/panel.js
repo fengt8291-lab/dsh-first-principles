@@ -3,6 +3,7 @@ import path from 'node:path'
 import { checkLedger } from './ledger.js'
 import { readRuns, summarizeRuns } from './runs.js'
 import { readGateEvents, summarizeGate } from './gate.js'
+import { anchorDigest, buildAnchor } from './anchor.js'
 
 /**
  * UI 面板的数据源：把 `.fp/` 下的台账、`runs.jsonl`、`gate.jsonl` 压成一份 JSON。
@@ -117,15 +118,28 @@ export function deriveTrend(runs = [], { days = 14, now = new Date() } = {}) {
     const key = dayKey(date)
     buckets.set(key, { date: key, total: 0, failed: 0, fixed: 0 })
   }
+  const codesByDay = new Map()
   for (const run of runs) {
-    const bucket = buckets.get(dayKey(run?.ts))
+    const key = dayKey(run?.ts)
+    const bucket = buckets.get(key)
     if (!bucket) continue
     bucket.total += 1
     if (run?.verdict !== 'pass') bucket.failed += 1
+    for (const code of Array.isArray(run?.errors) ? run.errors : []) {
+      const counts = codesByDay.get(key) ?? new Map()
+      counts.set(code, (counts.get(code) ?? 0) + 1)
+      codesByDay.set(key, counts)
+    }
   }
   for (const round of deriveFixRounds(runs, 1000)) {
     const bucket = buckets.get(dayKey(round?.ts))
     if (bucket) bucket.fixed += round.fixed.length
+  }
+  for (const day of buckets.values()) {
+    const counts = codesByDay.get(day.date)
+    day.codes = counts
+      ? [...counts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([code, count]) => ({ code, count }))
+      : []
   }
   return [...buckets.values()]
 }
@@ -145,7 +159,7 @@ export function topErrorCodes(runs = [], limit = 6) {
 }
 
 /** 面板一次要的全部数据；sessionId 给了就只看这个会话的校验记录。 */
-export const PANEL_VERSION = '0.4.0'
+export const PANEL_VERSION = '0.5.0'
 
 export function buildPanelState({ root, settings, gateEnabled, sessionId = null, roundsLimit = 12, runsLimit = 30 }) {
   const dirName = settings?.dir ?? '.fp'
@@ -154,6 +168,8 @@ export function buildPanelState({ root, settings, gateEnabled, sessionId = null,
   const ledgers = listLedgerFiles(root, dirName).map((ledger) => ledgerSummary(root, dirName, ledger, settings ?? {}))
   const expired = ledgers.filter((ledger) => ledger.meta?.expired).length
   const gateEvents = readGateEvents(root, dirName, 8)
+  const files = listLedgerFiles(root, dirName)
+  const anchor = anchorDigest(buildAnchor(root, files, { limit: 1 }), 'zh')
   return {
     version: PANEL_VERSION,
     project: root,
@@ -164,6 +180,8 @@ export function buildPanelState({ root, settings, gateEnabled, sessionId = null,
     rounds: deriveFixRounds(runs, roundsLimit),
     trend: deriveTrend(runs),
     topCodes: topErrorCodes(runs),
+    anchor,
+    anchorEntries: files.length,
     recent: runs.slice(-runsLimit).reverse(),
     gateEvents,
     generatedAt: new Date().toISOString(),

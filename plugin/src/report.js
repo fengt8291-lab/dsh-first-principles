@@ -56,9 +56,15 @@ function renderTemplate(value) {
   return lines.join('\n')
 }
 
+function renderAnchorValue(value) {
+  if (typeof value.anchor === 'string' && value.anchor.trim()) return value.anchor
+  return '项目里还没有台账，所以没有可继承的结论。先跑一次 first_principles_check 拿骨架。'
+}
+
 export function renderReport(value) {
   if (!value || typeof value !== 'object') return String(value ?? '')
   if (value.verdict === 'template') return renderTemplate(value)
+  if (value.verdict === 'anchor') return renderAnchorValue(value)
   return renderCheck(value)
 }
 

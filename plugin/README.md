@@ -58,6 +58,7 @@ first_principles_check path=.fp/ledgers/我的判断.md
 | `first_principles_check` | 不给参数：打印带真实引用的骨架；给参数：校验 |
 | `/fp status` | 校验项目里所有台账，标出到期与缺止损的 |
 | `/fp stats` | 它到现在帮你拦下了多少错（读 `.fp/runs.jsonl`） |
+| `/fp context` | 上次会话判了什么、还有什么没定（跨会话锚点） |
 | `/fp gate [on\|off]` | 可选闸门：不可逆操作前问一句（默认关），并检查台账 `scope` 是否覆盖要动的东西 |
 | `/fp reanchor` | 代码改过、行号漂了？按引文重新锚定 |
 | `/fp review 2026-11-20` | 盖下次复查日期 |

@@ -1,15 +1,16 @@
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { checkLedger, summarize } from './src/ledger.js'
+import { checkLedger, parseLedger, summarize } from './src/ledger.js'
 import { describeRoot, findProjectRoot } from './src/root.js'
 import { describeMeta, renderReport, toContent } from './src/report.js'
 import { sectionText, usageText } from './src/prompt.js'
 import { buildTemplate, probeProject, probeScope, suggestSlug, templateNotes } from './src/template.js'
 import { appendRun, readRuns, renderStats, summarizeRuns } from './src/runs.js'
 import { applyReanchor, planReanchor, setReviewAfter } from './src/reanchor.js'
-import { daysUntil, localDateKey, parseDateKey } from './src/meta.js'
+import { daysUntil, localDateKey, parseDateKey, reviewKeyFromHeader } from './src/meta.js'
 import { appendGateEvent, classifyExecution, extractTargets, readGateEvents, renderGateStatus, scopeCovers } from './src/gate.js'
 import { PANEL_VERSION, buildPanelState } from './src/panel.js'
+import { anchorDigest, buildAnchor, renderAnchor } from './src/anchor.js'
 import { createPanelHandler, PANEL_PREFIX } from './src/panel-route.js'
 
 export const name = 'first-principles'
@@ -158,6 +159,17 @@ async function runCheck(ctx, settings, args, agent) {
   const startedAt = Date.now()
   const found = await resolveRoot(ctx, agent, settings)
   const root = found.root
+  if (args.context === true) {
+    const files = listLedgers(root, settings)
+    const anchor = buildAnchor(root, files, { limit: 3 })
+    return {
+      verdict: 'anchor',
+      ledgerPath: files[0] ? path.relative(root, files[0].path) : '',
+      anchor: renderAnchor(anchor, settings.language),
+      entries: anchor.entries.length,
+      generatedAt: anchor.generatedAt,
+    }
+  }
   const explicit = typeof args.path === 'string' ? args.path.trim() : ''
   const document = typeof args.document === 'string' ? args.document.trim() : ''
   let text = document || null
@@ -193,8 +205,48 @@ async function runCheck(ctx, settings, args, agent) {
   // 宿主按 output.schema 校验返回值：ledgerPath 声明成 string，null 会让整次调用报错。
   report.ledgerPath = typeof report.ledgerPath === 'string' && report.ledgerPath ? path.relative(root, report.ledgerPath) : ''
   if (found.foundBy !== 'cwd') report.rootNote = describeRoot(found)
+  const drift = driftWarning(root, settings, ledgerPath, report)
+  if (drift) report.warnings.push(drift)
   recordRun(root, settings, report, report.ledgerPath || '(inline)', startedAt, { session: sessionIdOf(agent) })
   return report
+}
+
+function sameQuestion(left, right) {
+  const flat = (value) => String(value ?? '').replace(/\s+/g, '').replace(/[，。,.!?！？:：;；]/g, '').toLowerCase()
+  return flat(left) === flat(right)
+}
+
+/**
+ * W008：项目里还有别的、没过期的台账，且问题跟这次不一样。
+ * 这是「换题了却没交代」的机械信号——不判断谁对，只提醒别假装没看过。
+ */
+function driftWarning(root, settings, currentPath, report) {
+  if (report.verdict !== 'pass') return null
+  const question = report.header?.question
+  if (!question) return null
+  const now = new Date()
+  const others = []
+  for (const ledger of listLedgers(root, settings)) {
+    if (currentPath && path.resolve(ledger.path) === path.resolve(currentPath)) continue
+    try {
+      const parsed = parseLedger(readFileSync(ledger.path, 'utf8'))
+      const reviewAfter = reviewKeyFromHeader(parsed.header.extra)
+      const date = reviewAfter ? parseDateKey(reviewAfter) : null
+      if (date && (daysUntil(date, now) ?? 0) < 0) continue
+      if (!parsed.header.question) continue
+      if (sameQuestion(parsed.header.question, question)) continue
+      others.push(path.relative(root, ledger.path))
+    } catch {
+      /* 读不到的旧台账不参与漂移判断 */
+    }
+  }
+  if (others.length === 0) return null
+  return {
+    code: 'W008',
+    at: 'ledger',
+    message: `项目里还有 ${others.length} 份没过期的台账，问题跟这次不一样：${others.slice(0, 3).join(', ')}`,
+    hint: '换题了就明说为什么换；同一件事就合并成一份台账，别让两份结论各说各话',
+  }
 }
 
 /** 最近一份「通过且没过期」的台账。闸门只问有没有，不假装知道它跟这次操作有没有关系。 */
@@ -304,6 +356,7 @@ function doctorText(root, settings, runtime, found) {
     `斜杠命令：${command.registered ? '已注册 /fp' : `未注册（${command.reason}）`}`,
     `闸门：${runtime.gate ? '开' : '关'}（配置值 ${settings.gate ? 'true' : 'false'}，运行期可 /fp gate on|off）`,
     `台账：${list.length} 份${list.length ? `，最新 ${path.relative(root, list[0])}` : ''}`,
+    `跨会话锚点：${anchorDigest(buildAnchor(root, list, { limit: 1 }), settings.language)}`,
     `运行记录：${runs.length} 条（${settings.dir}/runs.jsonl）· 闸门记录：${gateEvents.length} 条（${settings.dir}/gate.jsonl）`,
     `数据目录：${path.join(root, settings.dir)}`,
   ]
@@ -312,6 +365,12 @@ function doctorText(root, settings, runtime, found) {
     lines.push('面板未注册时：对话输入框下方不会有状态栏。多半是 webServer 服务在插件加载时还没就绪；本版已改为等它就绪再注册，若仍为未注册，请把这一行贴给开发者。')
   }
   return lines.join('\n')
+}
+
+function contextText(root, settings) {
+  const files = listLedgers(root, settings)
+  if (files.length === 0) return '还没有台账，没有可继承的结论。先跑一次 first_principles_check 拿骨架。'
+  return renderAnchor(buildAnchor(root, files, { limit: 3 }), settings.language)
 }
 
 function gateText(root, settings, runtime, rest) {
@@ -330,6 +389,7 @@ const PARAMETERS = {
     path: { type: 'string', description: '台账文件路径（相对项目根目录）。省略时取最新一份台账；一份都没有则返回骨架。' },
     document: { type: 'string', description: '直接传入台账全文校验，而不是读取文件。' },
     strict: { type: 'boolean', description: 'true 时 warning 也算不通过。' },
+    context: { type: 'boolean', description: 'true 时不安检、只看项目里最近几份台账的结论与未决项（跨会话锚点）。' },
   },
   additionalProperties: false,
 }
@@ -338,7 +398,7 @@ function createTool(ctx, settings) {
   return {
     name: 'first_principles_check',
     description:
-      '校验第一性原理台账：每条事实必须落回真实的 文件:行 且反引号引文逐字可比对；每条假设必须带 falsify 可证伪条件；结论依赖的假设必须出现在 Revisit；review_after 到期会提示。不传参数时返回一份带真实引用的骨架。',
+      '校验第一性原理台账：每条事实必须落回真实的 文件:行 且反引号引文逐字可比对；每条假设必须带 falsify 可证伪条件；结论依赖的假设必须出现在 Revisit；review_after 到期会提示。不传参数时返回一份带真实引用的骨架；传 context: true 则返回最近几份台账的结论与未决项（跨会话锚点）。',
     parameters: PARAMETERS,
     output: {
       schema: {
@@ -477,7 +537,7 @@ function reviewText(root, settings, rest) {
 function createCommand(ctx, settings, runtime) {
   return {
     name: 'fp',
-    description: '第一性原理台账：/fp 看用法，/fp status 校验全部台账，/fp stats 看纠错统计，/fp gate [on|off] 开关闸门，/fp reanchor 重锚行号，/fp review <日期> 设备查日期，/fp doctor 看面板与数据面状态，/fp <文件> 校验指定台账',
+    description: '第一性原理台账：/fp 看用法，/fp status 校验全部台账，/fp stats 看纠错统计，/fp gate [on|off] 开关闸门，/fp reanchor 重锚行号，/fp review <日期> 设备查日期，/fp context 看上次结论与未决项，/fp doctor 看面板与数据面状态，/fp <文件> 校验指定台账',
     handler: async (invocation) => {
       const found = await resolveRoot(ctx, invocation?.agent, settings)
       const root = found.root
@@ -487,6 +547,7 @@ function createCommand(ctx, settings, runtime) {
       const rest = tail.join(' ')
       if (head === 'status') return { kind: 'success', text: statusText(root, settings, found) }
       if (head === 'stats') return { kind: 'success', text: statsText(root, settings) }
+      if (head === 'context' || head === 'anchor') return { kind: 'success', text: contextText(root, settings) }
       if (head === 'gate') return { kind: 'success', text: gateText(root, settings, runtime, rest) }
       if (head === 'reanchor') return { kind: 'success', text: reanchorText(root, settings, rest.trim()) }
       if (head === 'review') return { kind: 'success', text: reviewText(root, settings, rest) }

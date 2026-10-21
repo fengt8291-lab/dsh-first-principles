@@ -15,11 +15,11 @@ kill: 发布 30 天后重复使用率 <10%，或 10 人访谈中 ≥7 人表示�
   波普尔：科学没有岩床，只有暂时够牢的桩。
 - F3 · docs/RESEARCH-first-principles.md:105 · `five state-of-the-art AI assistants consistently exhibit sycophancy across four varied free-form text-generation tasks.`
   谄媚是系统性行为，不是偶发。
-- F4 · docs/LEDGER-FORMAT.md:204 · `只检查它非空`
+- F4 · docs/LEDGER-FORMAT.md:205 · `只检查它非空`
   校验器明确不判断 falsify 是否真的可证伪。
 - F5 · plugin/src/ledger.js:472 · `结论依赖的假设没有出现在 Revisit`
   E014：结论闭包内的假设必须进入 Revisit。
-- F6 · README.md:147 · `只认不可逆操作；读操作与可逆写不拦——误拦一次，用户就会把整个插件关掉。`
+- F6 · README.md:148 · `只认不可逆操作；读操作与可逆写不拦——误拦一次，用户就会把整个插件关掉。`
   M5 把闸门做成可选：默认关，只在不可逆操作前问一句。
 - F7 · PLAN.md:157 · `有效的不是「更好的提示词」，而是「独立检查器 + 显式前提 + 可撤回的依赖图」`
   PLAN 的核心结论。
@@ -31,7 +31,7 @@ kill: 发布 30 天后重复使用率 <10%，或 10 人访谈中 ≥7 人表示�
   dogfooding 暴露的证据落地约束。
 - F11 · docs/RESEARCH-first-principles.md:145 · `criteria of refutation have to be laid down beforehand`
   证伪条件必须先于观察写死。
-- F12 · README.md:77 · `82 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10）`
+- F12 · README.md:78 · `89 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10 / 锚点 7）`
   M5 测试现状：校验器 28、M4 17、闸门 8、可移植性 7、装配 6，共 66 条。
 
 ## Assumptions

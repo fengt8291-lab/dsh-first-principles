@@ -29,6 +29,13 @@ window.__ModuleLoader__.load({
       code: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11 },
       fix: { color: 'var(--dsh-success-color, #2e9e5b)' },
       bad: { color: 'var(--dsh-danger-color, #d9534f)' },
+      trendWrap: { position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 4 },
+      tip: {
+        position: 'absolute', bottom: '100%', marginBottom: 6, padding: '5px 8px', zIndex: 20,
+        border: `1px solid ${LINE}`, borderRadius: 6, whiteSpace: 'nowrap', pointerEvents: 'none',
+        background: 'var(--dsh-surface-color, rgba(24,24,24,0.96))', color: 'inherit',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.28)', fontSize: 11, lineHeight: 1.5,
+      },
       btn: {
         font: 'inherit', padding: '2px 8px', borderRadius: 6, border: `1px solid ${LINE}`,
         background: 'transparent', color: 'inherit', cursor: 'pointer',
@@ -52,6 +59,7 @@ window.__ModuleLoader__.load({
       const [state, setState] = useState(null)
       const [error, setError] = useState(null)
       const [open, setOpen] = useState(false)
+      const [hover, setHover] = useState(null)
       const [busy, setBusy] = useState(false)
 
       const load = useCallback(async () => {
@@ -122,6 +130,9 @@ window.__ModuleLoader__.load({
           h('span', { style: styles.muted }, `${summary.total ?? 0} 次校验`),
           h('span', { style: styles.muted }, `拦下 ${summary.failed ?? 0}`),
           h('span', { style: styles.muted }, `${ledgers.length} 份台账`),
+          state.anchor
+            ? h('span', { style: { ...styles.muted, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: state.anchor }, state.anchor)
+            : null,
           fixedTotal > 0 ? h('span', { style: styles.fix }, `已修 ${fixedTotal} 个错误码`) : null,
           state.version ? h('span', { style: styles.muted, title: '插件版本' }, `v${state.version}`) : null,
           state.command && state.command.registered === false
@@ -161,15 +172,16 @@ window.__ModuleLoader__.load({
             h('div', { style: styles.title }, '最近 14 天'),
             trend.every((day) => day.total === 0)
               ? h('div', { style: styles.muted }, '还没有校验记录。')
-              : h('div', { style: { ...styles.row, alignItems: 'flex-end', gap: 4 } },
-                ...trend.map((day) =>
+              : h('div', { style: styles.trendWrap, onMouseLeave: () => setHover(null) },
+                ...trend.map((day, index) =>
                   h('div', {
                     key: day.date,
-                    title: `${day.date} · 校验 ${day.total} · 拦下 ${day.failed} · 修掉 ${day.fixed}`,
+                    onMouseEnter: () => setHover(index),
                     style: {
                       width: 8,
                       height: 3 + Math.round((day.total / peak) * 20),
                       borderRadius: 2,
+                      cursor: 'default',
                       background: day.failed > 0
                         ? 'var(--dsh-danger-color, #d9534f)'
                         : day.total > 0 ? 'var(--dsh-success-color, #2e9e5b)' : LINE,
@@ -177,6 +189,21 @@ window.__ModuleLoader__.load({
                     },
                   }),
                 ),
+                hover !== null && trend[hover]
+                  ? h('div', {
+                    style: {
+                      ...styles.tip,
+                      left: Math.min(hover * 12, Math.max(0, 180)) - 40,
+                    },
+                  },
+                    h('div', { style: { fontWeight: 600 } },
+                      `${trend[hover].date} · 校验 ${trend[hover].total} · 拦下 ${trend[hover].failed} · 修掉 ${trend[hover].fixed}`),
+                    h('div', { style: styles.muted },
+                      (trend[hover].codes ?? []).length
+                        ? trend[hover].codes.map((entry) => `${entry.code}×${entry.count}`).join(' · ')
+                        : trend[hover].total === 0 ? '没有校验记录' : '没有拦下的错误'),
+                  )
+                  : null,
               ),
             topCodes.length
               ? h('div', { style: styles.row },

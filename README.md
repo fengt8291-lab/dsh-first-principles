@@ -35,7 +35,8 @@ M4 之后它还能：给结论一个**保质期**（`review_after` / `confidence
 | --- | --- |
 | 提示段 `first-principles` | 常驻系统提示，约 120 token：什么任务要建台账、六段怎么写、什么任务别建 |
 | 工具 `first_principles_check` | 不传参返回骨架（F1/F2 直接引用真实文件行）；传参校验并给出错误码 |
-| 斜杠命令 `/fp` | `/fp` 用法 · `/fp status` 汇总所有台账（含过期标记）· `/fp stats` 纠错统计 · `/fp gate [on\|off]` 开关闸门 · `/fp reanchor` 按引文重锚行号 · `/fp review <日期>` 盖复查日期 · `/fp doctor` 看面板/命令/数据面状态 · `/fp <文件>` 校验指定台账 |
+| 跨会话锚点 | 新会话开始时，模型传 `context: true`（或你敲 `/fp context`）就能读到最近 3 份台账的**问题 / 结论 / 未决项 / 复查日期**；另加 `W008`：项目里还有另一份没过期、问法不同的台账时提醒一句。这是「工具 + 命令 + 提示」，没有自动改写系统提示 |
+| 斜杠命令 `/fp` | `/fp` 用法 · `/fp status` 汇总所有台账（含过期标记）· `/fp stats` 纠错统计 · `/fp gate [on\|off]` 开关闸门 · `/fp reanchor` 按引文重锚行号 · `/fp review <日期>` 盖复查日期 · `/fp context` 看上次会话判了什么、还有什么没定 · `/fp doctor` 看面板/命令/数据面状态 · `/fp <文件>` 校验指定台账 |
 | 可选闸门（默认关） | `gate: true` 或 `/fp gate on` 后，`rm -r`、`git push --force`、`git reset --hard`、`npm publish`、`gh * delete`、`docker rm`、`kubectl delete`、`drop table`、`dd` 写盘这类**不可逆**操作前问一句；有一份通过、未过期、**且 scope 覆盖这次要动的东西**的台账才放行；指不出路径的整仓操作（`git reset --hard` 等）、项目外路径、带通配符的目标不判断，读操作与可逆写零打扰 |
 | 运行记录 `.fp/runs.jsonl` | 每次真实校验追加一行（verdict / 错误码 / 条数 / 耗时），只追加、坏行跳过，供统计与以后的可视化面板用 |
 | 闸门记录 `.fp/gate.jsonl` | 每次闸门判断追加一行（规则 / 工具 / 询问或放行 / 放行依据的台账），用来观察误拦 |
@@ -55,13 +56,14 @@ plugin/
   src/root.js            项目根定位（子目录、monorepo、任意技术栈）
   src/reanchor.js        按引文重新定位行号、改写复查日期
   src/runs.js            运行记录与纠错统计（以后的可视化数据源）
+  src/anchor.js          跨会话锚点：抽取上次的问题/结论/未决/复查
   src/gate.js            可选闸门的不可逆规则表与判断日志
   src/panel.js           面板数据：台账状态 / 会话过滤 / 每轮修复差集
   src/panel-route.js     面板 HTTP 面（GET /state、POST /gate）
   src/template.js        骨架生成（任意项目结构都能探到可引用行）
   src/prompt.js          提示段与用法文案
   src/report.js          面向模型的结果渲染
-tests/                   82 个测试（校验器/闸门/可移植性/装配/面板）
+tests/                   89 个测试（校验器/闸门/可移植性/装配/面板/锚点）
 examples/trial-length.md 示例台账：业务决策（试用期从 14 天改 7 天）
 docs/LEDGER-FORMAT.md    格式规范与判定边界
 docs/DIRECTION.md        方向与路线（含 kill criteria）
@@ -74,7 +76,7 @@ PLAN.md                  完整设计与里程碑
 ## 4. 开发与安装
 
 ```bash
-node --test tests/*.test.js     # 82 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10）
+node --test tests/*.test.js     # 89 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10 / 锚点 7）
 ```
 
 已发布到 npm（线上是 `0.3.1`；本地这版是 `0.4.0`，面板 v2 与闸门相关性，等你确认后我再发），别人这台机器上的装法二选一：

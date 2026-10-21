@@ -7,6 +7,7 @@ export function sectionText({ language, dir }) {
       'Six fixed sections: Facts (`path:line` plus a verbatim backticked excerpt) · Assumptions (basis + falsify) · Open (probe, ends with resolved(...) or deferred(...)) · Derivation (from IDs) · Conclusion (depends: IDs) · Revisit (which assumptions would invalidate it).',
       'Header carries the life of the conclusion: review_after: YYYY-MM-DD (the checker warns once it passes), confidence: 0.0-1.0, kill: when to admit the judgement was wrong.',
       'A ledger that cannot pass is usually one of three things: a "fact" with no citation, an assumption with no falsifier, or a conclusion leaning on assumptions without a revisit condition.',
+      'At the start of a fresh session, if the project already has ledgers, call first_principles_check with context: true — read the previous question, conclusions and open items before deciding. Build on them or say why you are changing the question; do not pretend you never saw them.',
       'Skip it for typos, log lines and running tests — discipline must not become ritual.',
     ].join('\n')
   }
@@ -16,6 +17,7 @@ export function sectionText({ language, dir }) {
     '六段固定：Facts（`路径:行` + 反引号原文，校验器逐字比对）· Assumptions（basis + falsify）· Open（probe，结尾 resolved(...) 或 deferred(...)）· Derivation（from 编号）· Conclusion（depends: 编号）· Revisit（列出结论依赖的假设）。',
     '头部再加三行，给结论一个保质期：review_after: 2026-11-20（到期会提醒）· confidence: 0.0–1.0（说清有多确定）· kill: 什么情况下承认判断失败。',
     '过不了校验通常是三种：没有引用的"事实"、写不出 falsify 的假设、结论依赖了假设却没有失效条件。',
+    '新会话开始时，如果项目里已经有台账，先调 first_principles_check 并传 context: true，把上次的问题、结论与未决项读到眼前；要么接着用，要么明确说为什么换题——别假装没看过。',
     '改错字、加日志、跑测试这类小事不建台账——纪律用成仪式就只剩仪式。',
   ].join('\n')
 }
@@ -37,7 +39,7 @@ export function usageText({ language, dir }) {
       '  /fp review 2026-11-20 [file]              → stamp the next review date',
       '',
       'Error codes: E001 header · E002 scope empty · E003 unverifiable fact · E004 missing file · E005 line range · E006 excerpt mismatch · E007 basis · E008 falsify · E009 dangling ref · E010 cycle · E011 conclusion w/o depends · E012 open status · E013 no revisit · E014 assumption w/o revisit · E015 outside cwd · E016 id · E017 self-reference · E018 confidence value · E019 review_after value · E020 ledger too large · E021 parse failure',
-      'Warnings: W001 unused fact · W002 ambiguous excerpt · W003 no assumptions · W004 conclusion on assumptions only · W005 stale ledger · W006 self-reference marked policy · W007 review_after passed',
+      'Warnings: W001 unused fact · W002 ambiguous excerpt · W003 no assumptions · W004 conclusion on assumptions only · W005 stale ledger · W006 self-reference marked policy · W007 review_after passed · W008 another live ledger asks a different question',
     ].join('\n')
   }
   return [
@@ -53,8 +55,9 @@ export function usageText({ language, dir }) {
     '  /fp gate [on|off]                        → 可选闸门：不可逆操作前问一句（默认关）',
     '  /fp reanchor [文件]                      → 代码改了行号漂了？按引文重新锚定',
     '  /fp review 2026-11-20 [文件]             → 给台账盖上下次复查日期',
+    '  /fp context                              → 上次会话判了什么、还有什么没定（跨会话锚点）',
     '',
     '错误码：E001 头部 · E002 scope 为空 · E003 事实不可校验 · E004 文件不存在 · E005 行号越界 · E006 引文不符 · E007 basis · E008 falsify · E009 悬空引用 · E010 成环 · E011 结论缺 depends · E012 Open 无终态 · E013 缺 Revisit · E014 假设无失效条件 · E015 越出项目目录 · E016 编号 · E017 自引（引用台账/决策文档/自身）· E018 confidence 取值 · E019 review_after 取值 · E020 台账过大 · E021 解析失败',
-    '警告：W001 未使用的事实 · W002 引文重复 · W003 无假设 · W004 结论只靠假设 · W005 台账比代码旧 · W006 自引但已标 [policy] · W007 review_after 已过期',
+    '警告：W001 未使用的事实 · W002 引文重复 · W003 无假设 · W004 结论只靠假设 · W005 台账比代码旧 · W006 自引但已标 [policy] · W007 review_after 已过期 · W008 项目里还有另一份问法不同的活台账',
   ].join('\n')
 }
