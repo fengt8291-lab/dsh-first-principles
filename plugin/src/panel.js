@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { checkLedger } from './ledger.js'
 import { readRuns, summarizeRuns } from './runs.js'
-import { readGateEvents } from './gate.js'
+import { readGateEvents, summarizeGate } from './gate.js'
 
 /**
  * UI 面板的数据源：把 `.fp/` 下的台账、`runs.jsonl`、`gate.jsonl` 压成一份 JSON。
@@ -101,8 +101,51 @@ export function deriveFixRounds(runs = [], limit = 12) {
   return rounds.sort((left, right) => String(right.ts ?? '').localeCompare(String(left.ts ?? ''))).slice(0, limit)
 }
 
+function dayKey(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** 最近 N 天的校验量/失败量/修掉数，喂给面板底部那条趋势。 */
+export function deriveTrend(runs = [], { days = 14, now = new Date() } = {}) {
+  const buckets = new Map()
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const date = new Date(now)
+    date.setDate(date.getDate() - index)
+    const key = dayKey(date)
+    buckets.set(key, { date: key, total: 0, failed: 0, fixed: 0 })
+  }
+  for (const run of runs) {
+    const bucket = buckets.get(dayKey(run?.ts))
+    if (!bucket) continue
+    bucket.total += 1
+    if (run?.verdict !== 'pass') bucket.failed += 1
+  }
+  for (const round of deriveFixRounds(runs, 1000)) {
+    const bucket = buckets.get(dayKey(round?.ts))
+    if (bucket) bucket.fixed += round.fixed.length
+  }
+  return [...buckets.values()]
+}
+
+/** 历史上最常被拦下的错误码：用来回答「这东西到底帮我抓到了什么」。 */
+export function topErrorCodes(runs = [], limit = 6) {
+  const counts = new Map()
+  for (const run of runs) {
+    for (const code of Array.isArray(run?.errors) ? run.errors : []) {
+      counts.set(code, (counts.get(code) ?? 0) + 1)
+    }
+  }
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, limit)
+    .map(([code, count]) => ({ code, count }))
+}
+
 /** 面板一次要的全部数据；sessionId 给了就只看这个会话的校验记录。 */
-export const PANEL_VERSION = '0.3.1'
+export const PANEL_VERSION = '0.4.0'
 
 export function buildPanelState({ root, settings, gateEnabled, sessionId = null, roundsLimit = 12, runsLimit = 30 }) {
   const dirName = settings?.dir ?? '.fp'
@@ -110,16 +153,19 @@ export function buildPanelState({ root, settings, gateEnabled, sessionId = null,
   const runs = sessionId ? allRuns.filter((run) => !run.session || run.session === sessionId) : allRuns
   const ledgers = listLedgerFiles(root, dirName).map((ledger) => ledgerSummary(root, dirName, ledger, settings ?? {}))
   const expired = ledgers.filter((ledger) => ledger.meta?.expired).length
+  const gateEvents = readGateEvents(root, dirName, 8)
   return {
     version: PANEL_VERSION,
     project: root,
     dir: dirName,
-    gate: { enabled: Boolean(gateEnabled) },
+    gate: { enabled: Boolean(gateEnabled), summary: summarizeGate(gateEvents) },
     ledgers,
     summary: { ...summarizeRuns(runs), ledgers: ledgers.length, expired },
     rounds: deriveFixRounds(runs, roundsLimit),
+    trend: deriveTrend(runs),
+    topCodes: topErrorCodes(runs),
     recent: runs.slice(-runsLimit).reverse(),
-    gateEvents: readGateEvents(root, dirName, 8),
+    gateEvents,
     generatedAt: new Date().toISOString(),
   }
 }

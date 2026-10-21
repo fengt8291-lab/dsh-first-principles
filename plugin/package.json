@@ -1,6 +1,6 @@
 {
   "name": "dsh-first-principles",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "First-principles ledger for DeepSeek Harness: a machine-checked reasoning artifact whose every fact must resolve to a real file:line, plus a panel showing what each round fixed.",
   "type": "module",
   "license": "MIT",

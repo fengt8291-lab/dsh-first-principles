@@ -8,7 +8,7 @@ import { buildTemplate, probeProject, probeScope, suggestSlug, templateNotes } f
 import { appendRun, readRuns, renderStats, summarizeRuns } from './src/runs.js'
 import { applyReanchor, planReanchor, setReviewAfter } from './src/reanchor.js'
 import { daysUntil, localDateKey, parseDateKey } from './src/meta.js'
-import { appendGateEvent, classifyExecution, readGateEvents, renderGateStatus } from './src/gate.js'
+import { appendGateEvent, classifyExecution, extractTargets, readGateEvents, renderGateStatus, scopeCovers } from './src/gate.js'
 import { PANEL_VERSION, buildPanelState } from './src/panel.js'
 import { createPanelHandler, PANEL_PREFIX } from './src/panel-route.js'
 
@@ -198,7 +198,8 @@ async function runCheck(ctx, settings, args, agent) {
 }
 
 /** 最近一份「通过且没过期」的台账。闸门只问有没有，不假装知道它跟这次操作有没有关系。 */
-function findFreshPass(root, settings) {
+function findFreshPasses(root, settings) {
+  const found = []
   for (const ledger of listLedgers(root, settings)) {
     try {
       const report = checkLedger({
@@ -208,16 +209,50 @@ function findFreshPass(root, settings) {
         options: { maxFileBytes: settings.maxFileBytes, maxEntries: settings.maxEntries, maxItems: settings.maxItems },
       })
       if (report.verdict === 'pass' && !report.meta?.expired) {
-        return { rel: path.relative(root, ledger.path), meta: report.meta }
+        found.push({ rel: path.relative(root, ledger.path), meta: report.meta, scope: report.header?.scope ?? [] })
       }
     } catch {
       /* 坏台账跳过，闸门不该因为读不懂一份台账就卡住 */
     }
   }
-  return null
+  return found
 }
 
-function gateReason(hit, settings) {
+/** 把命令行里的目标路径折算成工作区相对路径；指不出、在项目外、带通配符的一律返回 null。 */
+function toWorkspaceRelative(root, target) {
+  const raw = String(target ?? '').trim()
+  if (!raw || /[*?]/.test(raw)) return null
+  const absolute = path.isAbsolute(raw) ? path.normalize(raw) : path.resolve(root, raw)
+  const rel = path.relative(root, absolute)
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null
+  return rel.split(path.sep).join('/')
+}
+
+/**
+ * 闸门相关性：能指认路径的操作，要求通过校验的台账 scope 覆盖它。
+ * 指不出路径（整仓操作 / 项目外 / 通配符）就退回旧行为——宁可漏，不误拦。
+ */
+function judgeRelevance(passes, hit, exec, root) {
+  const targets = extractTargets(hit, exec)
+  if (!targets.judgeable) return { decision: passes.length ? 'allow' : 'ask', reason: passes.length ? 'ok' : 'no-ledger', ledger: passes[0]?.rel ?? null, targets: [] }
+  const relative = targets.paths.map((item) => toWorkspaceRelative(root, item))
+  const inside = relative.filter(Boolean)
+  if (inside.length === 0) {
+    return { decision: passes.length ? 'allow' : 'ask', reason: passes.length ? 'ok' : 'no-ledger', ledger: passes[0]?.rel ?? null, targets: [] }
+  }
+  const covering = passes.find((pass) => inside.every((item) => scopeCovers(pass.scope, item)))
+  if (covering) return { decision: 'allow', reason: 'ok', ledger: covering.rel, targets: inside }
+  return { decision: passes.length ? 'ask' : 'ask', reason: passes.length ? 'scope' : 'no-ledger', ledger: passes[0]?.rel ?? null, targets: inside }
+}
+
+function gateReason(hit, settings, verdict) {
+  if (verdict?.reason === 'scope') {
+    const where = (verdict.targets ?? []).join(', ')
+    if (settings.language === 'en') {
+      return `Irreversible operation (${hit.rule}) touches ${where}, which no passing ledger's scope covers. Widen that ledger's scope and re-run first_principles_check — or approve this one time if you know the consequences.`
+    }
+    return `不可逆操作（${hit.rule}）要动 ${where}，而通过校验的台账 scope 没覆盖这里。先把那份台账的 scope 补上并重新校验；如果你清楚后果，直接批准这一次也行。`
+  }
   if (settings.language === 'en') {
     return `Irreversible operation (${hit.rule}) with no usable ledger. Write the reasoning into ${settings.dir}/ledgers/ and run first_principles_check until verdict=pass first — or approve this one time if you know the consequences.`
   }
@@ -232,21 +267,24 @@ function createGateHandler(ctx, settings, runtime) {
       const hit = classifyExecution(exec)
       if (!hit) return next()
       const found = await resolveRoot(ctx, exec?.agent, settings)
-      const pass = findFreshPass(found.root, settings)
+      const passes = findFreshPasses(found.root, settings)
+      const verdict = judgeRelevance(passes, hit, exec, found.root)
       try {
         appendGateEvent(found.root, settings.dir, {
           ts: new Date().toISOString(),
           tool: hit.tool,
           rule: hit.rule,
           detail: hit.detail,
-          decision: pass ? 'allow' : 'ask',
-          ledger: pass?.rel ?? null,
+          decision: verdict.decision,
+          ledger: verdict.ledger,
+          reason: verdict.reason,
+          targets: verdict.targets.length ? verdict.targets : undefined,
         })
       } catch {
         /* 日志写不进去也要照常判断 */
       }
-      if (pass) return next()
-      return { kind: 'ask', reason: gateReason(hit, settings) }
+      if (verdict.decision === 'allow') return next()
+      return { kind: 'ask', reason: gateReason(hit, settings, verdict) }
     } catch {
       return next()
     }

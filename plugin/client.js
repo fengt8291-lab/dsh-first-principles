@@ -105,6 +105,9 @@ window.__ModuleLoader__.load({
       const ledgers = state.ledgers ?? []
       const rounds = state.rounds ?? []
       const recent = state.recent ?? []
+      const trend = state.trend ?? []
+      const topCodes = state.topCodes ?? []
+      const peak = Math.max(1, ...trend.map((day) => day.total))
       const gateOn = Boolean(state.gate?.enabled)
       const fixedTotal = rounds.reduce((sum, round) => sum + (round.fixed?.length ?? 0), 0)
 
@@ -155,6 +158,38 @@ window.__ModuleLoader__.load({
               )),
           ),
           h('div', null,
+            h('div', { style: styles.title }, '最近 14 天'),
+            trend.every((day) => day.total === 0)
+              ? h('div', { style: styles.muted }, '还没有校验记录。')
+              : h('div', { style: { ...styles.row, alignItems: 'flex-end', gap: 4 } },
+                ...trend.map((day) =>
+                  h('div', {
+                    key: day.date,
+                    title: `${day.date} · 校验 ${day.total} · 拦下 ${day.failed} · 修掉 ${day.fixed}`,
+                    style: {
+                      width: 8,
+                      height: 3 + Math.round((day.total / peak) * 20),
+                      borderRadius: 2,
+                      background: day.failed > 0
+                        ? 'var(--dsh-danger-color, #d9534f)'
+                        : day.total > 0 ? 'var(--dsh-success-color, #2e9e5b)' : LINE,
+                      opacity: day.total > 0 ? 1 : 0.5,
+                    },
+                  }),
+                ),
+              ),
+            topCodes.length
+              ? h('div', { style: styles.row },
+                h('span', { style: styles.muted }, '最常拦下：'),
+                ...topCodes.map((entry) =>
+                  h('span', { key: entry.code, style: { ...styles.chip, cursor: 'default' } },
+                    h('span', { style: styles.code }, entry.code),
+                    h('span', { style: styles.muted }, `×${entry.count}`)),
+                ),
+              )
+              : null,
+          ),
+          h('div', null,
             h('div', { style: styles.title }, '最近校验'),
             recent.length === 0
               ? h('div', { style: styles.muted }, '本会话还没有校验记录。')
@@ -173,6 +208,9 @@ window.__ModuleLoader__.load({
                 h('span', { style: styles.muted }, timeOf(event.ts)),
                 h('span', { style: styles.code }, event.rule ?? event.tool ?? ''),
                 h('span', { style: event.decision === 'ask' ? styles.bad : styles.muted }, event.decision === 'ask' ? '问了' : '放行'),
+                event.reason === 'scope'
+                  ? h('span', { style: { ...styles.muted, ...styles.code, fontSize: 11 } }, 'scope 未覆盖')
+                  : null,
               ),
             )),
           ) : null,

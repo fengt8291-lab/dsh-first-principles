@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { apply } from '../plugin/index.js'
-import { classifyExecution, summarizeGate, renderGateStatus } from '../plugin/src/gate.js'
+import { classifyExecution, extractTargets, scopeCovers, summarizeGate, renderGateStatus } from '../plugin/src/gate.js'
 
 function fakeCtx() {
   const disposers = []
@@ -125,16 +125,66 @@ test('闸门打开 + 无台账 + 不可逆 → ask，并留一条日志', async 
   assert.equal(log[0].rule, 'rm')
 })
 
-test('闸门打开 + 通过且未过期的台账 → 放行', async () => {
+test('闸门打开 + 台账 scope 覆盖目标 → 放行', async () => {
   const dir = projectDir()
   writeLedger(dir)
   const { ctx, handlers } = fakeCtx()
   apply(ctx, { gate: true })
-  const decision = await handlers[0].handler({ ...exec('bash', { command: 'rm -rf build' }), agent: { session: { header: { cwd: dir } } } }, next)
+  const decision = await handlers[0].handler({ ...exec('bash', { command: 'rm -rf package.json' }), agent: { session: { header: { cwd: dir } } } }, next)
   assert.equal(decision.via, 'next')
   const log = readFileSync(path.join(dir, '.fp', 'gate.jsonl'), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
   assert.equal(log.at(-1).decision, 'allow')
+  assert.equal(log.at(-1).reason, 'ok')
   assert.match(log.at(-1).ledger, /\.fp\/ledgers\/gate\.md$/)
+})
+
+test('闸门打开 + 台账 scope 不覆盖目标 → ask（相关性）', async () => {
+  const dir = projectDir()
+  writeLedger(dir)
+  const { ctx, handlers } = fakeCtx()
+  apply(ctx, { gate: true })
+  const decision = await handlers[0].handler({ ...exec('bash', { command: 'rm -rf src' }), agent: { session: { header: { cwd: dir } } } }, next)
+  assert.equal(decision.kind, 'ask')
+  assert.match(decision.reason, /scope 没覆盖/)
+  assert.match(decision.reason, /src/)
+  const log = readFileSync(path.join(dir, '.fp', 'gate.jsonl'), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+  assert.equal(log.at(-1).decision, 'ask')
+  assert.equal(log.at(-1).reason, 'scope')
+  assert.deepEqual(log.at(-1).targets, ['src'])
+})
+
+test('整仓操作指不出路径 → 有可用台账就放行', async () => {
+  const dir = projectDir()
+  writeLedger(dir)
+  const { ctx, handlers } = fakeCtx()
+  apply(ctx, { gate: true })
+  const decision = await handlers[0].handler({ ...exec('bash', { command: 'git reset --hard HEAD~1' }), agent: { session: { header: { cwd: dir } } } }, next)
+  assert.equal(decision.via, 'next')
+})
+
+test('项目外路径与通配符目标都不判断 → 放行', async () => {
+  const dir = projectDir()
+  writeLedger(dir)
+  const { ctx, handlers } = fakeCtx()
+  apply(ctx, { gate: true })
+  const outside = await handlers[0].handler({ ...exec('bash', { command: 'rm -rf /tmp/fp-gate-outside' }), agent: { session: { header: { cwd: dir } } } }, next)
+  assert.equal(outside.via, 'next')
+  const wildcard = await handlers[0].handler({ ...exec('bash', { command: 'rm -rf src/*.ts' }), agent: { session: { header: { cwd: dir } } } }, next)
+  assert.equal(wildcard.via, 'next')
+})
+
+test('extractTargets / scopeCovers：只认能指认的路径', () => {
+  const rm = extractTargets({ rule: 'rm' }, exec('bash', { command: 'rm -rf a/b "c d" --verbose' }))
+  assert.deepEqual(rm.paths, ['a/b', 'c d'])
+  assert.equal(rm.judgeable, true)
+  assert.equal(extractTargets({ rule: 'git-reset-hard' }, exec('bash', { command: 'git reset --hard' })).judgeable, false)
+  assert.equal(extractTargets({ rule: 'sql-drop' }, exec('bash', { command: 'drop table x' })).judgeable, false)
+  assert.equal(scopeCovers(['src/**/*.js'], 'src/a/b.js'), true)
+  assert.equal(scopeCovers(['src/auth/**'], 'src/auth/session.ts'), true)
+  assert.equal(scopeCovers(['README.md'], 'README.md'), true)
+  assert.equal(scopeCovers(['src'], 'src/a.js'), true)
+  assert.equal(scopeCovers(['src/**'], 'tests/a.js'), false)
+  assert.equal(scopeCovers([], 'a.js'), false)
 })
 
 test('闸门打开 + 普通命令 → 零打扰', async () => {

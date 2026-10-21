@@ -116,9 +116,11 @@ M0 的真实价值是**验证了“可围栏化错误”能被稳定抓住**：�
 | **M3.5（已完成）** | **证据落地**：`docs/evidence/` 约定 + 自引禁区 `E017`/`W006` | 外部材料先落盘再引用；台账引用决策文档会被打回 |
 | **M3.6（新增）** | **跨会话锚点**：用 `sessionProjections` 把 `question` / `C*` / 未决 `O*` 投影成会话级状态 | 新会话里能查到上一个会话的 question 与结论；目标漂移会被指出 |
 | **M4（已完成）** | **复查字段 + 可移植**：`review_after`/`confidence`/`kill`（`E018`/`E019`/`W007`）、`/fp status` 过期标记、`/fp reanchor` 重锚、`/fp review` 盖日期；根目录定位、路径/编码/大小容错（`E020`）、`.fp/runs.jsonl` + `/fp stats` | 58 tests 通过（含 `tests/portability.test.js` 7 例：Python/Go/Rust/monorepo/中文空格路径/裸目录/自定义台账目录）；过期台账被标出；改文档后一条命令修复全部漂移；没有 `package.json` 的项目也能开箱生成可过检骨架 |
-| **M5（已完成）** | **可选闸门**：`tools/pre-execute` 监听器，只对不可逆操作（`rm -r`/`git push --force`/`npm publish`/`gh * delete`/`docker rm`/`kubectl delete`/`drop table`/`dd` 写盘）返回 `ask`；默认关，`/fp gate on\|off` 可切，判断落 `.fp/gate.jsonl` | 66 tests 通过（闸门 8 例；面板与 inject 修复后全套 75）；关着零打扰、打开后普通命令不碰；询问日志可回看，误拦率可观察；拿不到上下文时一律放行 |
+| **M5（已完成）** | **可选闸门（含相关性判断）**：`tools/pre-execute` 监听器，只对不可逆操作（`rm -r`/`git push --force`/`npm publish`/`gh * delete`/`docker rm`/`kubectl delete`/`drop table`/`dd` 写盘）返回 `ask`；默认关，`/fp gate on\|off` 可切，判断落 `.fp/gate.jsonl` | 66 tests 通过（闸门 8 例；面板与 inject 修复后全套 75）；关着零打扰、打开后普通命令不碰；询问日志可回看，误拦率可观察；拿不到上下文时一律放行；**M5.1 相关性**：`rm` 的目标路径必须被某份通过台账的 `scope` 覆盖，整仓/项目外/通配符目标不判断（宁可漏不误拦），询问原因写进 `gate.jsonl` 的 `reason`/`targets` |
 | M6 | 分发：npm 发布 + `dsh-plugin` 市场条目 + 双语 README + 3 个示例台账 | `npm view dsh-first-principles` 有版本；市场可搜到 |
 | **M7 v1（已完成，2026-10-20）** | **纠错面板（Web UI）**：`conversation.composer.dock` 状态栏 + 详情面板，一键开关闸门、按会话展示每轮修掉的错误码、台账过期与闸门判定；数据读 `.fp/runs.jsonl` / `.fp/gate.jsonl`，数据面 `/x-first-principles/state`（GET）/`/gate`（POST） | 75 tests（面板 7 例 + 装配 8 例）；面板数字与 `/fp stats` 同源（同一 `summarizeRuns`）；`runs.jsonl` 起 M4、`gate.jsonl` 起 M5，历史不缺 |
+
+| **M7 v2（已完成，2026-10-21）** | 面板加 14 天柱状趋势（绿色通过/红色拦下）、最常被拦下的错误码 `×N`、闸门判定原因（`scope 未覆盖`）；`buildPanelState` 输出 `trend` / `topCodes` / `gate.summary` | 82 tests（闸门 12 例 + 面板 10 例）；趋势与「已修」同源（都从 `runs.jsonl` 算），不新增任何写路径 |
 
 **关于 M7 的时机**：用户 2026-10-20 明确提出“想让大家看到这个插件帮自己纠了多少错”，随后在 M5 收尾时改口“发布之前还是做一个前端”。所以 M4 先把**数据**记全（`runs.jsonl` 一行一次校验）、M5 记闸门判定，M7 v1 只做展示层与闸门开关，不改判定逻辑。面板第一屏回答三件事：闸门开没开、这一轮修掉了哪几个错误码、哪份台账该复查了。
 

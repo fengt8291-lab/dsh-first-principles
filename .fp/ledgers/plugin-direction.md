@@ -25,13 +25,13 @@ kill: 发布 30 天后重复使用率 <10%，或 10 人访谈中 ≥7 人表示�
   PLAN 的核心结论。
 - F8 · docs/evidence/market-scan-2026-10-20.md:46 · `ledger 类条目共 22 条，排名第一的是记忆型插件 dsh-ledger-memory，不是校验型台账。`
   生态空位的可核对依据：索引里 ledger 类插件排第一的是记忆型，不是校验型。
-- F9 · docs/DIRECTION.md:143 · `生成过台账的用户中第二次使用率 < 10%` [policy]
+- F9 · docs/DIRECTION.md:145 · `生成过台账的用户中第二次使用率 < 10%` [policy]
   本项目自己承诺的 kill criteria（不是对世界的判断，故标注 policy）。
 - F10 · docs/RESEARCH-first-principles.md:205 · `外部网页/论文/报价不能直接当事实引用——它们不在仓库里，检查器无法逐字比对`
   dogfooding 暴露的证据落地约束。
 - F11 · docs/RESEARCH-first-principles.md:145 · `criteria of refutation have to be laid down beforehand`
   证伪条件必须先于观察写死。
-- F12 · README.md:77 · `75 passed（校验器 28 / M4 17 / 闸门 8 / 可移植性 7 / 装配 8 / 面板 7）`
+- F12 · README.md:77 · `82 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10）`
   M5 测试现状：校验器 28、M4 17、闸门 8、可移植性 7、装配 6，共 66 条。
 
 ## Assumptions

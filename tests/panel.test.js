@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { buildPanelState, deriveFixRounds, panelHeadline } from '../plugin/src/panel.js'
+import { buildPanelState, deriveFixRounds, deriveTrend, panelHeadline, topErrorCodes } from '../plugin/src/panel.js'
 import { createPanelHandler, PANEL_PREFIX } from '../plugin/src/panel-route.js'
 
 test('deriveFixRounds 只把错误码的变化算成一轮', () => {
@@ -132,4 +132,39 @@ test('面板路由：坏请求有明确状态码，不会把异常抛进宿主',
   await failing(fakeRequest('GET', `${PANEL_PREFIX}/state`), big)
   assert.equal(big.statusCode, 500)
   assert.match(JSON.parse(big.body).error, /boom/)
+})
+
+test('deriveTrend 按本地日期归桶：校验数、拦下数、修掉数各归各位', () => {
+  const now = new Date(2026, 9, 21, 12, 0, 0)
+  const runs = [
+    { ts: new Date(2026, 9, 20, 9, 0, 0).toISOString(), ledger: 'a.md', verdict: 'fail', errors: ['E006'] },
+    { ts: new Date(2026, 9, 20, 9, 30, 0).toISOString(), ledger: 'a.md', verdict: 'pass', errors: [] },
+    { ts: new Date(2026, 9, 21, 8, 0, 0).toISOString(), ledger: 'a.md', verdict: 'fail', errors: ['E012'] },
+  ]
+  const trend = deriveTrend(runs, { days: 3, now })
+  assert.equal(trend.length, 3)
+  assert.deepEqual(trend.map((day) => day.total), [0, 2, 1])
+  assert.deepEqual(trend.map((day) => day.failed), [0, 1, 1])
+  assert.deepEqual(trend.map((day) => day.fixed), [0, 1, 0])
+  assert.match(trend[2].date, /^2026-10-21$/)
+})
+
+test('deriveTrend 忽略窗口外的记录', () => {
+  const now = new Date(2026, 9, 21, 12, 0, 0)
+  const trend = deriveTrend([{ ts: new Date(2026, 8, 1, 9, 0, 0).toISOString(), verdict: 'fail', errors: ['E005'] }], { days: 7, now })
+  assert.equal(trend.reduce((sum, day) => sum + day.total, 0), 0)
+})
+
+test('topErrorCodes 按出现次数排序并截断', () => {
+  const runs = [
+    { errors: ['E006', 'E006'] },
+    { errors: ['E006', 'E012'] },
+    { errors: ['E012', 'E012', 'E005'] },
+    { errors: [] },
+  ]
+  const top = topErrorCodes(runs, 2)
+  assert.deepEqual(top.map((entry) => entry.count), [3, 3])
+  assert.deepEqual(top.map((entry) => entry.code).sort(), ['E006', 'E012'])
+  assert.equal(topErrorCodes(runs, 1).length, 1)
+  assert.deepEqual(topErrorCodes([], 6), [])
 })

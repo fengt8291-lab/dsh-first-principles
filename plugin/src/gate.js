@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { globToRegExp } from './evidence.js'
 
 /**
  * 可选闸门：只在「删掉就回不来」的操作前问一句，别的都不管。
@@ -49,10 +50,63 @@ export function classifyExecution(exec) {
   return null
 }
 
+/**
+ * 从被拦下的调用里找出「它到底要动哪里」，用于判断台账覆盖不覆盖。
+ * - rm：取非选项参数（含通配符就不判断，交给调用方放弃）
+ * - 仓库级操作（git reset --hard / clean / push --force / publish）：整仓，指不出具体路径
+ * - 其余规则：没有文件路径，维持旧行为
+ */
+const REPO_WIDE_RULES = new Set(['git-reset-hard', 'git-clean', 'git-push-force', 'publish'])
+
+function splitArgs(text) {
+  const out = []
+  const re = /'([^']*)'|"([^"]*)"|(\S+)/g
+  let match
+  while ((match = re.exec(String(text ?? '')))) {
+    out.push(match[1] ?? match[2] ?? match[3] ?? '')
+  }
+  return out.filter(Boolean)
+}
+
+export function extractTargets(hit, exec) {
+  const empty = { paths: [], repoWide: false, judgeable: false }
+  if (!hit) return empty
+  if (REPO_WIDE_RULES.has(hit.rule)) return { paths: [], repoWide: true, judgeable: false }
+  if (hit.rule !== 'rm') return empty
+  const command = typeof exec?.arguments?.command === 'string' ? exec.arguments.command : ''
+  if (!command) return empty
+  const paths = []
+  const segment = /(?:^|[;&|]\s*)rm\s+([^\n;&|]*)/g
+  let match
+  while ((match = segment.exec(command))) {
+    for (const token of splitArgs(match[1])) {
+      if (token.startsWith('-')) continue
+      paths.push(token)
+    }
+  }
+  return { paths: [...new Set(paths)], repoWide: false, judgeable: paths.length > 0 }
+}
+
+/** 台账的 scope 是否覆盖某个工作区相对路径。目录写法按前缀算，通配按 glob 算。 */
+export function scopeCovers(patterns, relativePath) {
+  const target = String(relativePath ?? '').replace(/\\/g, '/').replace(/^\.\//, '')
+  if (!target) return false
+  for (const raw of patterns ?? []) {
+    const pattern = String(raw ?? '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')
+    if (!pattern) continue
+    if (pattern === target) return true
+    if (!/[*?]/.test(pattern)) {
+      if (target.startsWith(`${pattern}/`)) return true
+      continue
+    }
+    if (globToRegExp(pattern).test(target)) return true
+  }
+  return false
+}
+
 export function gateLogPath(root, dirName) {
   return path.join(root, dirName, GATE_LOG)
 }
-
 export function appendGateEvent(root, dirName, record) {
   const file = gateLogPath(root, dirName)
   mkdirSync(path.dirname(file), { recursive: true })
@@ -95,7 +149,8 @@ export function summarizeGate(events) {
 
 function stamp(event) {
   const ts = typeof event?.ts === 'string' ? event.ts.slice(5, 16).replace('T', ' ') : '?'
-  return `${ts} ${event?.decision === 'allow' ? '放行' : '询问'} · ${event?.rule ?? '?'} · ${event?.tool ?? '?'}${event?.detail ? ` · ${event.detail}` : ''}`
+  const why = event?.reason === 'scope' ? '（scope 未覆盖）' : event?.reason === 'no-ledger' ? '（没有可用台账）' : ''
+  return `${ts} ${event?.decision === 'allow' ? '放行' : '询问'} · ${event?.rule ?? '?'} · ${event?.tool ?? '?'}${event?.detail ? ` · ${event.detail}` : ''}${why}`
 }
 
 export function renderGateStatus({ enabled, events, dirName }) {
@@ -107,7 +162,8 @@ export function renderGateStatus({ enabled, events, dirName }) {
     lines.push('关：/fp gate off。配置 gate: true 可永久开启。')
   }
   lines.push('规则只认能确认的：rm -r、git push --force、git reset --hard、git clean -f、npm/pnpm/yarn publish、gh * delete、docker rm、kubectl delete、drop table、dd 写盘；读操作与可逆写不拦。')
-  lines.push(`放行条件：项目里有一份通过校验且没到 review_after 的台账；没有就问一句，由你决定。`)
+  lines.push(`放行条件：有一份通过校验、没到 review_after、且 scope 覆盖这次要动的东西的台账。`)
+  lines.push('覆盖是怎么算的：能指认路径的操作（rm）拿路径去比 scope；git reset --hard / git clean -f / git push --force / publish 是整仓操作，比不出路径，只要有可用台账就放行；路径在项目外或带通配符时同样不判断——宁可漏，不误拦。')
   if (summary.total === 0) {
     lines.push(`还没有记录。日志：${dirName}/${GATE_LOG}`)
     return lines.join('\n')

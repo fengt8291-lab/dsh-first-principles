@@ -1,2 +1,10 @@
 {"ts":"2026-10-20T14:23:34.684Z","tool":"bash","rule":"rm","detail":"rm -rf /tmp/fp-gate-probe-does-not-exist && echo \"命令执行了\"","decision":"allow","ledger":".fp/ledgers/plugin-direction.md"}
 {"ts":"2026-10-20T14:25:18.658Z","tool":"bash","rule":"rm","detail":"rm -rf /tmp/fp-gate-probe-does-not-exist-2 && echo \"执行了（说明被放行）\"","decision":"ask","ledger":null}
+{"ts":"2026-10-21T05:19:36.750Z","tool":"bash","rule":"rm","detail":"rm -rf plugin/src/panel.js","decision":"ask","ledger":null,"reason":"no-ledger","targets":["plugin/src/panel.js"]}
+{"ts":"2026-10-21T05:19:36.753Z","tool":"bash","rule":"rm","detail":"rm -rf build","decision":"ask","ledger":null,"reason":"no-ledger","targets":["build"]}
+{"ts":"2026-10-21T05:19:36.755Z","tool":"bash","rule":"git-reset-hard","detail":"git reset --hard HEAD~1","decision":"ask","ledger":null,"reason":"no-ledger"}
+{"ts":"2026-10-21T05:19:36.757Z","tool":"bash","rule":"rm","detail":"rm -rf /tmp/whatever","decision":"ask","ledger":null,"reason":"no-ledger"}
+{"ts":"2026-10-21T05:19:45.519Z","tool":"bash","rule":"rm","detail":"rm -rf plugin/src/panel.js","decision":"allow","ledger":".fp/ledgers/plugin-direction.md","reason":"ok","targets":["plugin/src/panel.js"]}
+{"ts":"2026-10-21T05:19:45.523Z","tool":"bash","rule":"rm","detail":"rm -rf build","decision":"ask","ledger":".fp/ledgers/plugin-direction.md","reason":"scope","targets":["build"]}
+{"ts":"2026-10-21T05:19:45.524Z","tool":"bash","rule":"git-reset-hard","detail":"git reset --hard HEAD~1","decision":"allow","ledger":".fp/ledgers/plugin-direction.md","reason":"ok"}
+{"ts":"2026-10-21T05:19:45.526Z","tool":"bash","rule":"rm","detail":"rm -rf /tmp/whatever","decision":"allow","ledger":".fp/ledgers/plugin-direction.md","reason":"ok"}

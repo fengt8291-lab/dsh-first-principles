@@ -36,10 +36,10 @@ M4 之后它还能：给结论一个**保质期**（`review_after` / `confidence
 | 提示段 `first-principles` | 常驻系统提示，约 120 token：什么任务要建台账、六段怎么写、什么任务别建 |
 | 工具 `first_principles_check` | 不传参返回骨架（F1/F2 直接引用真实文件行）；传参校验并给出错误码 |
 | 斜杠命令 `/fp` | `/fp` 用法 · `/fp status` 汇总所有台账（含过期标记）· `/fp stats` 纠错统计 · `/fp gate [on\|off]` 开关闸门 · `/fp reanchor` 按引文重锚行号 · `/fp review <日期>` 盖复查日期 · `/fp doctor` 看面板/命令/数据面状态 · `/fp <文件>` 校验指定台账 |
-| 可选闸门（默认关） | `gate: true` 或 `/fp gate on` 后，`rm -r`、`git push --force`、`git reset --hard`、`npm publish`、`gh * delete`、`docker rm`、`kubectl delete`、`drop table`、`dd` 写盘这类**不可逆**操作前问一句；有通过且未过期的台账就放行，读操作与可逆写零打扰 |
+| 可选闸门（默认关） | `gate: true` 或 `/fp gate on` 后，`rm -r`、`git push --force`、`git reset --hard`、`npm publish`、`gh * delete`、`docker rm`、`kubectl delete`、`drop table`、`dd` 写盘这类**不可逆**操作前问一句；有一份通过、未过期、**且 scope 覆盖这次要动的东西**的台账才放行；指不出路径的整仓操作（`git reset --hard` 等）、项目外路径、带通配符的目标不判断，读操作与可逆写零打扰 |
 | 运行记录 `.fp/runs.jsonl` | 每次真实校验追加一行（verdict / 错误码 / 条数 / 耗时），只追加、坏行跳过，供统计与以后的可视化面板用 |
 | 闸门记录 `.fp/gate.jsonl` | 每次闸门判断追加一行（规则 / 工具 / 询问或放行 / 放行依据的台账），用来观察误拦 |
-| 面板（Web UI） | 输入框下方（`conversation.composer.dock`）一条「第一性原理」状态栏：**点一下切闸门**、看本会话已修掉几个错误码、台账是否过期、最近校验与闸门判定；展开看细节。数据面是 `/x-first-principles/state`；面板代码在**重启 DSH**、刷新页面后才挂上（工具/命令/面板都在启动时注册一次） |
+| 面板（Web UI） | 输入框下方（`conversation.composer.dock`）一条「第一性原理」状态栏：**点一下切闸门**、看本会话已修掉几个错误码、台账是否过期、最近校验与闸门判定；展开看 **最近 14 天趋势**（绿=通过、红=拦下）与**最常被拦下的错误码**、最近校验与闸门判定（含「scope 未覆盖」这种原因）。数据面是 `/x-first-principles/state`；面板代码在**重启 DSH**、刷新页面后才挂上（工具/命令/面板都在启动时注册一次） |
 
 ## 3. 目录
 
@@ -61,7 +61,7 @@ plugin/
   src/template.js        骨架生成（任意项目结构都能探到可引用行）
   src/prompt.js          提示段与用法文案
   src/report.js          面向模型的结果渲染
-tests/                   75 个测试（校验器/闸门/可移植性/装配/面板）
+tests/                   82 个测试（校验器/闸门/可移植性/装配/面板）
 examples/trial-length.md 示例台账：业务决策（试用期从 14 天改 7 天）
 docs/LEDGER-FORMAT.md    格式规范与判定边界
 docs/DIRECTION.md        方向与路线（含 kill criteria）
@@ -74,10 +74,10 @@ PLAN.md                  完整设计与里程碑
 ## 4. 开发与安装
 
 ```bash
-node --test tests/*.test.js     # 75 passed（校验器 28 / M4 17 / 闸门 8 / 可移植性 7 / 装配 8 / 面板 7）
+node --test tests/*.test.js     # 82 passed（校验器 28 / M4 17 / 闸门 12 / 可移植性 7 / 装配 8 / 面板 10）
 ```
 
-已发布到 npm（`0.3.1`），别人这台机器上的装法二选一：
+已发布到 npm（线上是 `0.3.1`；本地这版是 `0.4.0`，面板 v2 与闸门相关性，等你确认后我再发），别人这台机器上的装法二选一：
 
 ```bash
 npm install dsh-first-principles          # 或在 DSH 里：plugin_manager install_bundle target=dsh-first-principles@0.3.1
@@ -94,7 +94,7 @@ plugin_manager install_bundle  target=<plugin 绝对路径>
 给别人用，现在有两条路：
 
 1. **今天就能用**：把 `plugin/` 整个目录打包发过去，对方在自己的 DSH 里 `install_bundle target=<解压后的绝对路径>`（零依赖，不需要 npm 账号）。
-2. **进市场**：`npm publish` + 提交 `dsh-plugin` 目录。包已经准备好了（`0.3.1`，`npm pack --dry-run` 会包含 client.js 与 src/panel*.js，包名 `dsh-first-principles` 仍未被占用），只差你 `npm login`——本机 `npm whoami` 还是 `ENEEDAUTH`，我没有你的 token。完整清单见 `docs/PUBLISH.md`。
+2. **发布与市场**：`0.3.1` 已发 npm；市场 PR [#8417](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/8417) 已开，正等仓库年龄检查自动转绿（约 2026-10-21 22:43 后）。流程与坑见 `docs/PUBLISH.md`。
 
 ### 已实测
 
@@ -169,7 +169,7 @@ allowBuilds:                                          # 5 个既有包，显式�
 | --- | --- |
 | ~~M5~~（已完成） | **可选闸门**：`gate: true` 时 `tools/pre-execute` 只对不可逆操作返回 `ask`；默认关，可逆操作零打扰 |
 | M6 | **分发**：npm 发布 + 插件市场条目 + 双语 README；示例台账 3 份 |
-| ~~M7 v1~~（已完成） | **纠错统计面板**：`conversation.composer.dock` 里的状态栏 + 详情面板，闸门一键开关、本会话每轮修掉的错误码、台账过期、闸门判定；数据读 `.fp/runs.jsonl` / `.fp/gate.jsonl`（v2 再做趋势图与按天分布） |
+| ~~M7 v1~~（已完成）、M7 v2（已完成） | **纠错统计面板**：`conversation.composer.dock` 里的状态栏 + 详情面板，闸门一键开关、本会话每轮修掉的错误码、台账过期、闸门判定；数据读 `.fp/runs.jsonl` / `.fp/gate.jsonl`；v2 补了 14 天柱状趋势、最常拦下的错误码、闸门判定原因 |
 
 ## 8. 方向决策（2026-10-20）
 
