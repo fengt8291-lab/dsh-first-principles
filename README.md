@@ -77,6 +77,12 @@ PLAN.md                  完整设计与里程碑
 node --test tests/*.test.js     # 75 passed（校验器 28 / M4 17 / 闸门 8 / 可移植性 7 / 装配 8 / 面板 7）
 ```
 
+已发布到 npm（`0.3.1`），别人这台机器上的装法二选一：
+
+```bash
+npm install dsh-first-principles          # 或在 DSH 里：plugin_manager install_bundle target=dsh-first-principles@0.3.1
+```
+
 安装（由 DSH 的插件管理器完成，不要手写 profile 的 package.json / patch）：
 
 ```
